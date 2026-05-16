@@ -1,0 +1,24 @@
+[project]
+name = "logitrack"
+version = "1.0.0"
+description = "LogiTrack - ERP System for Inventory and Logistics Management"
+requires-python = ">=3.12"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+# E/W — pycodestyle, F — pyflakes, I — isort, UP — pyupgrade, B — flake8-bugbear
+select = ["E", "W", "F", "I", "UP", "B"]
+ignore = [
+    "E501",  # line too long
+    "B008",  # do not perform function calls in default arguments
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
