@@ -1,4 +1,3 @@
-
 from app.models.associations import product_supplier
 from app.models.base import Base, TimestampMixin
 from app.models.category import Category
