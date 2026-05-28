@@ -14,9 +14,7 @@ class StockRepository:
         self.session = session
 
     # Stock queries
-    async def get_stock(
-        self, product_id: int, warehouse_id: int
-    ) -> Stock | None:
+    async def get_stock(self, product_id: int, warehouse_id: int) -> Stock | None:
         stmt = select(Stock).where(
             Stock.product_id == product_id,
             Stock.warehouse_id == warehouse_id,
@@ -24,9 +22,7 @@ class StockRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_or_create_stock(
-        self, product_id: int, warehouse_id: int
-    ) -> Stock:
+    async def get_or_create_stock(self, product_id: int, warehouse_id: int) -> Stock:
         stock = await self.get_stock(product_id, warehouse_id)
         if stock is None:
             stock = Stock(
@@ -57,13 +53,14 @@ class StockRepository:
 
     # Movement queries
     async def get_movements(
-        self, offset: int = 0, limit: int = 100
+        self, offset: int = 0, limit: int = 100, movement_type: str | None = None
     ) -> list[StockMovement]:
+        stmt = select(StockMovement)
+        if movement_type:
+            stmt = stmt.where(StockMovement.movement_type == movement_type)
+
         stmt = (
-            select(StockMovement)
-            .order_by(StockMovement.created_at.desc())
-            .offset(offset)
-            .limit(limit)
+            stmt.order_by(StockMovement.created_at.desc()).offset(offset).limit(limit)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

@@ -1,6 +1,6 @@
 import logging
 
-from app.core.exceptions import InvalidMovementError
+from app.core.exceptions import InsufficientStockError, InvalidMovementError
 from app.models.movement import MovementType, StockMovement
 from app.models.warehouse import Stock
 from app.repositories.stock import StockRepository
@@ -17,17 +17,15 @@ class StockService:
     async def get_stock_by_warehouse(
         self, warehouse_id: int, offset: int = 0, limit: int = 100
     ) -> list[Stock]:
-        return await self.repository.get_stock_by_warehouse(
-            warehouse_id, offset, limit
-        )
+        return await self.repository.get_stock_by_warehouse(warehouse_id, offset, limit)
 
     async def get_stock_by_product(self, product_id: int) -> list[Stock]:
         return await self.repository.get_stock_by_product(product_id)
 
     async def get_movements(
-        self, offset: int = 0, limit: int = 100
+        self, offset: int = 0, limit: int = 100, movement_type: str | None = None
     ) -> list[StockMovement]:
-        return await self.repository.get_movements(offset, limit)
+        return await self.repository.get_movements(offset, limit, movement_type)
 
     # Core business operation
     async def process_movement(
@@ -35,7 +33,6 @@ class StockService:
         data: StockMovementCreate,
         performed_by_id: int,
     ) -> StockMovement:
-
         self._validate_warehouse_refs(data)
 
         match data.movement_type:
@@ -73,9 +70,7 @@ class StockService:
         match data.movement_type:
             case MovementType.incoming:
                 if data.to_warehouse_id is None:
-                    raise InvalidMovementError(
-                        "IN movement requires to_warehouse_id"
-                    )
+                    raise InvalidMovementError("IN movement requires to_warehouse_id")
                 if data.from_warehouse_id is not None:
                     raise InvalidMovementError(
                         "IN movement must not have from_warehouse_id"
@@ -101,6 +96,21 @@ class StockService:
                         "must be different"
                     )
 
+    # Stock validation
+    async def _ensure_sufficient_stock(
+        self, product_id: int, warehouse_id: int, required_qty: int
+    ) -> Stock:
+        stock = await self.repository.get_stock(product_id, warehouse_id)
+        available = stock.quantity if stock else 0
+        if available < required_qty:
+            raise InsufficientStockError(
+                product_id=product_id,
+                warehouse_id=warehouse_id,
+                requested=required_qty,
+                available=available,
+            )
+        return stock  # type: ignore[return-value]
+
     # Movement processors
     async def _process_incoming(self, data: StockMovementCreate) -> None:
         assert data.to_warehouse_id is not None
@@ -111,8 +121,8 @@ class StockService:
 
     async def _process_outgoing(self, data: StockMovementCreate) -> None:
         assert data.from_warehouse_id is not None
-        stock = await self.repository.get_or_create_stock(
-            data.product_id, data.from_warehouse_id
+        stock = await self._ensure_sufficient_stock(
+            data.product_id, data.from_warehouse_id, data.quantity
         )
         stock.quantity -= data.quantity
 
@@ -120,8 +130,8 @@ class StockService:
         assert data.from_warehouse_id is not None
         assert data.to_warehouse_id is not None
 
-        source = await self.repository.get_or_create_stock(
-            data.product_id, data.from_warehouse_id
+        source = await self._ensure_sufficient_stock(
+            data.product_id, data.from_warehouse_id, data.quantity
         )
         source.quantity -= data.quantity
 

@@ -1,19 +1,10 @@
-"""
-Custom exceptions raised in the Repository / Service layer
-"""
+"""Custom exceptions raised in the Repository / Service layer."""
 
 
 class LogiTrackError(Exception):
     def __init__(self, detail: str = "An unexpected error occurred"):
         self.detail = detail
         super().__init__(self.detail)
-
-
-class NotFoundError(LogiTrackError):
-    def __init__(self, entity: str, identifier: int | str):
-        self.entity = entity
-        self.identifier = identifier
-        super().__init__(f"{entity} with id={identifier} not found")
 
 
 class AlreadyExistsError(LogiTrackError):
@@ -27,3 +18,22 @@ class AlreadyExistsError(LogiTrackError):
 class InvalidMovementError(LogiTrackError):
     def __init__(self, detail: str):
         super().__init__(detail)
+
+
+class InsufficientStockError(LogiTrackError):
+    def __init__(
+        self,
+        product_id: int,
+        warehouse_id: int,
+        requested: int,
+        available: int,
+    ):
+        self.product_id = product_id
+        self.warehouse_id = warehouse_id
+        self.requested = requested
+        self.available = available
+        super().__init__(
+            f"Insufficient stock for product_id={product_id} "
+            f"at warehouse_id={warehouse_id}: "
+            f"requested={requested}, available={available}"
+        )

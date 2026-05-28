@@ -1,10 +1,16 @@
 from fastapi import APIRouter, Depends, status
 
-from app.api.dependencies import get_stock_service
+from app.api.dependencies import get_current_user, get_stock_service, require_auth
+from app.models.movement import MovementType
+from app.models.user import User
 from app.schemas.stock import StockMovementCreate, StockMovementRead, StockRead
 from app.services.stock import StockService
 
-router = APIRouter(prefix="/stock", tags=["Stock & Movements"])
+router = APIRouter(
+    prefix="/stock",
+    tags=["Stock & Movements"],
+    dependencies=[Depends(require_auth)],
+)
 
 
 @router.post(
@@ -15,10 +21,10 @@ router = APIRouter(prefix="/stock", tags=["Stock & Movements"])
 )
 async def create_movement(
     body: StockMovementCreate,
+    current_user: User = Depends(get_current_user),
     service: StockService = Depends(get_stock_service),
 ) -> StockMovementRead:
-    performed_by_id = 1
-    movement = await service.process_movement(body, performed_by_id)
+    movement = await service.process_movement(body, current_user.id)
     return StockMovementRead.model_validate(movement)
 
 
@@ -28,11 +34,14 @@ async def create_movement(
     summary="List stock movement history",
 )
 async def list_movements(
+    movement_type: MovementType | None = None,
     offset: int = 0,
     limit: int = 100,
     service: StockService = Depends(get_stock_service),
 ) -> list[StockMovementRead]:
-    items = await service.get_movements(offset=offset, limit=limit)
+    items = await service.get_movements(
+        offset=offset, limit=limit, movement_type=movement_type
+    )
     return [StockMovementRead.model_validate(item) for item in items]
 
 

@@ -18,6 +18,17 @@ class UserCreate(BaseModel):
         return v.strip()
 
 
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str = Field(min_length=1, max_length=255)
+
+    @field_validator("full_name")
+    @classmethod
+    def strip_full_name(cls, v: str) -> str:
+        return v.strip()
+
+
 class UserRead(OrmBase):
     id: int
     email: EmailStr
