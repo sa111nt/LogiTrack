@@ -9,7 +9,6 @@ target-version = "py312"
 line-length = 88
 
 [tool.ruff.lint]
-# E/W — pycodestyle, F — pyflakes, I — isort, UP — pyupgrade, B — flake8-bugbear
 select = ["E", "W", "F", "I", "UP", "B"]
 ignore = [
     "E501",  # line too long
@@ -22,3 +21,8 @@ known-first-party = ["app"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
