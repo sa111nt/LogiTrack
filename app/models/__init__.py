@@ -21,3 +21,6 @@ __all__ = [
     "MovementType",
     "StockMovement",
 ]
+
+from app.models.revoked_token import RevokedToken
+from app.models.idempotency import IdempotencyKey
