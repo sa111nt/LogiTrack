@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 
 from app.api.dependencies import get_auth_service, get_current_user
 from app.models.user import User
@@ -60,3 +60,16 @@ async def get_me(
     current_user: User = Depends(get_current_user),
 ) -> UserRead:
     return UserRead.model_validate(current_user)
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Logout current user and revoke token",
+)
+async def logout_user(
+    body: RefreshRequest,
+    service: AuthService = Depends(get_auth_service),
+    access_token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")),
+) -> None:
+    await service.logout(access_token=access_token, refresh_token=body.refresh_token)

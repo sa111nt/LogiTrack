@@ -37,3 +37,7 @@ class InsufficientStockError(LogiTrackError):
             f"at warehouse_id={warehouse_id}: "
             f"requested={requested}, available={available}"
         )
+
+class ResourceConflictError(LogiTrackError):
+    def __init__(self, detail: str):
+        super().__init__(detail)

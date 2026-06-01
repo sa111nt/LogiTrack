@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
 from app.core.security import decode_token
 from app.models.user import User, UserRole
+from app.models.revoked_token import RevokedToken
 from app.repositories.category import CategoryRepository
 from app.repositories.product import ProductRepository
 from app.repositories.stock import StockRepository
@@ -38,8 +39,15 @@ async def get_current_user(
     try:
         payload = decode_token(token, expected_type="access")
         email: str | None = payload.get("sub")
-        if email is None:
+        jti: str | None = payload.get("jti")
+        if email is None or jti is None:
             raise credentials_exception
+            
+        # Check if token is revoked
+        revoked = await session.get(RevokedToken, jti)
+        if revoked:
+            raise credentials_exception
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -84,7 +92,7 @@ async def get_auth_service(
     session: AsyncSession = Depends(get_async_db),
 ) -> AsyncGenerator[AuthService, None]:
     repo = UserRepository(session)
-    yield AuthService(repo)
+    yield AuthService(repo, session)
 
 
 async def get_category_service(

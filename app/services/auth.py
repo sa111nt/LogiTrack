@@ -1,6 +1,7 @@
 import logging
 
 import jwt
+from datetime import datetime, UTC
 from fastapi import HTTPException, status
 
 from app.core.exceptions import AlreadyExistsError
@@ -11,7 +12,9 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
+from app.models.revoked_token import RevokedToken
 from app.repositories.user import UserRepository
 from app.schemas.auth import TokenPair
 from app.schemas.user import UserRegister
@@ -20,8 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    def __init__(self, user_repository: UserRepository) -> None:
+    def __init__(self, user_repository: UserRepository, session: AsyncSession) -> None:
         self.user_repo = user_repository
+        self.session = session
 
     async def register(self, data: UserRegister) -> User:
         existing = await self.user_repo.get_by_email(data.email)
@@ -65,7 +69,13 @@ class AuthService:
         try:
             payload = decode_token(refresh_token, expected_type="refresh")
             email = payload.get("sub")
-            if email is None:
+            jti = payload.get("jti")
+            if email is None or jti is None:
+                raise credentials_exception
+
+            # Check if token is revoked
+            revoked = await self.session.get(RevokedToken, jti)
+            if revoked:
                 raise credentials_exception
         except jwt.ExpiredSignatureError:
             raise HTTPException(
@@ -90,3 +100,20 @@ class AuthService:
 
         logger.info("User refreshed token: %s", user.email)
         return TokenPair(access_token=access_token, refresh_token=new_refresh_token)
+
+    async def logout(self, access_token: str, refresh_token: str) -> None:
+        for token, token_type in [(access_token, "access"), (refresh_token, "refresh")]:
+            if not token:
+                continue
+            try:
+                payload = decode_token(token, expected_type=token_type)
+                jti = payload.get("jti")
+                exp = payload.get("exp")
+                if jti and exp:
+                    expires_at = datetime.fromtimestamp(exp, tz=UTC)
+                    revoked = RevokedToken(jti=jti, expires_at=expires_at)
+                    self.session.add(revoked)
+                    logger.info(f"Token revoked: {jti}")
+            except jwt.PyJWTError:
+                pass  # Invalid tokens are ignored on logout
+        await self.session.commit()

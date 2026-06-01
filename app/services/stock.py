@@ -1,10 +1,15 @@
+import json
 import logging
 
-from app.core.exceptions import InsufficientStockError, InvalidMovementError
+import hashlib
+from fastapi.encoders import jsonable_encoder
+
+from app.core.exceptions import InsufficientStockError, InvalidMovementError, ResourceConflictError
+from app.models.idempotency import IdempotencyKey
 from app.models.movement import MovementType, StockMovement
 from app.models.warehouse import Stock
 from app.repositories.stock import StockRepository
-from app.schemas.stock import StockMovementCreate
+from app.schemas.stock import StockMovementCreate, StockMovementRead
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +37,25 @@ class StockService:
         self,
         data: StockMovementCreate,
         performed_by_id: int,
-    ) -> StockMovement:
+        idempotency_key: str | None = None,
+    ) -> StockMovementRead:
+        # Idempotency check
+        request_hash = ""
+        if idempotency_key:
+            session = self.repository.session
+            cached = await session.get(IdempotencyKey, idempotency_key)
+            # Create a deterministic fingerprint of the request
+            request_hash = hashlib.sha256(
+                json.dumps(data.model_dump(mode="json"), sort_keys=True).encode()
+            ).hexdigest()
+            if cached:
+                if cached.user_id != performed_by_id:
+                    raise ResourceConflictError("Idempotency key already used by a different user")
+                if cached.request_hash != request_hash:
+                    raise ResourceConflictError("Idempotency key already used for a different request")
+                logger.info(f"Idempotency cache hit for {idempotency_key}")
+                return StockMovementRead(**cached.response_body)
+
         self._validate_warehouse_refs(data)
 
         match data.movement_type:
@@ -62,7 +85,23 @@ class StockService:
             data.product_id,
             data.quantity,
         )
-        return movement
+
+        # Serialize for response and cache
+        response_data = jsonable_encoder(StockMovementRead.model_validate(movement))
+
+        if idempotency_key:
+            session = self.repository.session
+            idem = IdempotencyKey(
+                key=idempotency_key,
+                request_hash=request_hash,
+                user_id=performed_by_id,
+                status_code=201,
+                response_body=response_data,
+            )
+            session.add(idem)
+            await session.commit()
+
+        return StockMovementRead.model_validate(movement)
 
     # Validation
     @staticmethod

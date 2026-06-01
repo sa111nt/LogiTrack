@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Header
 
 from app.api.dependencies import get_current_user, get_stock_service, require_auth
 from app.models.movement import MovementType
@@ -23,8 +23,11 @@ async def create_movement(
     body: StockMovementCreate,
     current_user: User = Depends(get_current_user),
     service: StockService = Depends(get_stock_service),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> StockMovementRead:
-    movement = await service.process_movement(body, current_user.id)
+    movement = await service.process_movement(
+        body, current_user.id, idempotency_key=idempotency_key
+    )
     return StockMovementRead.model_validate(movement)
 
 

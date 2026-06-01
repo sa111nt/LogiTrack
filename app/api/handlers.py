@@ -10,6 +10,7 @@ from app.core.exceptions import (
     InsufficientStockError,
     InvalidMovementError,
     LogiTrackError,
+    ResourceConflictError,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,16 @@ def register_exception_handlers(app: FastAPI) -> None:
         logger.warning("InvalidMovementError: %s", exc.detail)
         return JSONResponse(
             status_code=400,
+            content={"detail": exc.detail},
+        )
+
+    @app.exception_handler(ResourceConflictError)
+    async def resource_conflict_handler(
+        request: Request, exc: ResourceConflictError
+    ) -> JSONResponse:
+        logger.warning("ResourceConflictError: %s", exc.detail)
+        return JSONResponse(
+            status_code=409,
             content={"detail": exc.detail},
         )
 

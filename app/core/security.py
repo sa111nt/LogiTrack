@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import uuid
 
 import jwt
 from pwdlib import PasswordHash
@@ -26,7 +27,11 @@ def create_access_token(data: dict) -> str:
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update({
+        "exp": expire,
+        "type": "access",
+        "jti": uuid.uuid4().hex
+    })
     return jwt.encode(
         to_encode,
         settings.jwt_secret_key,
@@ -39,7 +44,11 @@ def create_refresh_token(data: dict) -> str:
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         days=settings.refresh_token_expire_days
     )
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({
+        "exp": expire,
+        "type": "refresh",
+        "jti": uuid.uuid4().hex
+    })
     return jwt.encode(
         to_encode,
         settings.jwt_secret_key,
