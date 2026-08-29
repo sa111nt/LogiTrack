@@ -31,6 +31,65 @@ Every domain - product, category, supplier, warehouse, stock, user - follows the
 
 `Product` and `Supplier` connect through a `product_supplier` join table. `Stock` is limited to exactly one row per `(product_id, warehouse_id)` pair via a unique constraint, and quantity can never go negative, that's a `CHECK (quantity >= 0)` at the database level, not something left to application code to enforce. Every change to stock also writes an immutable `StockMovement` row, typed `IN`, `OUT`, or `TRANSFER`, with its own `CHECK (quantity > 0)`.
 
+```mermaid
+flowchart TB
+
+    %% =========================
+    %% Catalog
+    %% =========================
+    subgraph Catalog["Catalog"]
+        Category["Category"]
+        Product["Product"]
+        Supplier["Supplier"]
+        ProductSupplier["product_supplier"]
+
+        Category -->|"1 : N"| Product
+        Product -->|"N : N"| ProductSupplier
+        Supplier -->|"N : N"| ProductSupplier
+    end
+
+    %% =========================
+    %% Inventory
+    %% =========================
+    subgraph Inventory["Inventory"]
+        Warehouse["Warehouse"]
+        Stock["Stock"]
+
+        Product -->|"1 : N"| Stock
+        Warehouse -->|"1 : N"| Stock
+    end
+
+    %% =========================
+    %% Operations
+    %% =========================
+    subgraph Operations["Stock operations"]
+        User["User"]
+        StockMovement["StockMovement"]
+
+        Product -->|"1 : N"| StockMovement
+        User -->|"1 : N"| StockMovement
+
+        Warehouse -->|"from_warehouse"| StockMovement
+        Warehouse -->|"to_warehouse"| StockMovement
+    end
+
+    %% =========================
+    %% Security
+    %% =========================
+    subgraph Security["Authentication support"]
+        IdempotencyKey["IdempotencyKey"]
+        RevokedToken["RevokedToken"]
+    end
+
+    %% =========================
+    %% Visual emphasis
+    %% =========================
+    classDef main stroke-width:3px
+
+    class Product,Stock,Warehouse,StockMovement main
+```  
+
+
 Stock movement requests also support an optional `Idempotency-Key`. The server stores a request fingerprint and the resulting response so that retries with the same key and payload return the original result instead of applying the movement twice. Reusing an idempotency key with a different request payload results in a `409 Conflict`.
 
 ### The core logic: processing a stock movement
