@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Header
+from fastapi import APIRouter, Depends, Header, status
 
 from app.api.dependencies import get_current_user, get_stock_service, require_auth
 from app.models.movement import MovementType

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import get_supplier_service, require_auth, require_manager
-from app.schemas.supplier import SupplierCreate, SupplierRead, SupplierUpdate
 from app.schemas.base import PaginatedResponse
+from app.schemas.supplier import SupplierCreate, SupplierRead, SupplierUpdate
 from app.services.supplier import SupplierService
 
 router = APIRouter(

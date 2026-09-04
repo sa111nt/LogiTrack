@@ -1,10 +1,14 @@
+import hashlib
 import json
 import logging
 
-import hashlib
 from fastapi.encoders import jsonable_encoder
 
-from app.core.exceptions import InsufficientStockError, InvalidMovementError, ResourceConflictError
+from app.core.exceptions import (
+    InsufficientStockError,
+    InvalidMovementError,
+    ResourceConflictError,
+)
 from app.models.idempotency import IdempotencyKey
 from app.models.movement import MovementType, StockMovement
 from app.models.warehouse import Stock

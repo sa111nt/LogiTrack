@@ -1,10 +1,16 @@
 import enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.product import Product
+    from app.models.user import User
+    from app.models.warehouse import Warehouse
 
 
 class MovementType(str, enum.Enum):
@@ -47,20 +53,16 @@ class StockMovement(Base, TimestampMixin):
         nullable=False,
     )
 
-    product: Mapped["Product"] = relationship(  # noqa: F821
-        back_populates="movements"
-    )
-    from_warehouse: Mapped["Warehouse | None"] = relationship(  # noqa: F821
+    product: Mapped["Product"] = relationship(back_populates="movements")
+    from_warehouse: Mapped["Warehouse | None"] = relationship(
         back_populates="outgoing_movements",
         foreign_keys=[from_warehouse_id],
     )
-    to_warehouse: Mapped["Warehouse | None"] = relationship(  # noqa: F821
+    to_warehouse: Mapped["Warehouse | None"] = relationship(
         back_populates="incoming_movements",
         foreign_keys=[to_warehouse_id],
     )
-    performed_by: Mapped["User"] = relationship(  # noqa: F821
-        back_populates="stock_movements"
-    )
+    performed_by: Mapped["User"] = relationship(back_populates="stock_movements")
 
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_movement_quantity_positive"),

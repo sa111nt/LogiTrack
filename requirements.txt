@@ -16,8 +16,9 @@ pwdlib[argon2]==0.2.1
 pyjwt==2.10.1
 python-multipart==0.0.20
 
-# Linting & Formatting (dev)
+# Linting, Typing & Formatting (dev)
 ruff==0.8.4
+mypy==1.14.1
 
 # Testing
 pytest==8.3.4

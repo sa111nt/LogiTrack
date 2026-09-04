@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import get_category_service, require_auth, require_manager
-from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
 from app.schemas.base import PaginatedResponse
+from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
 from app.services.category import CategoryService
 
 router = APIRouter(

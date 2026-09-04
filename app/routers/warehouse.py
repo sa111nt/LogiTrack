@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import get_warehouse_service, require_auth, require_manager
-from app.schemas.warehouse import WarehouseCreate, WarehouseRead, WarehouseUpdate
 from app.schemas.base import PaginatedResponse
+from app.schemas.warehouse import WarehouseCreate, WarehouseRead, WarehouseUpdate
 from app.services.warehouse import WarehouseService
 
 router = APIRouter(

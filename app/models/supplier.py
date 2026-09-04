@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.product import Product
 
 
 class Supplier(Base, TimestampMixin):
@@ -14,7 +19,7 @@ class Supplier(Base, TimestampMixin):
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
 
-    products: Mapped[list["Product"]] = relationship(  # noqa: F821
+    products: Mapped[list["Product"]] = relationship(
         secondary="product_supplier",
         back_populates="suppliers",
     )

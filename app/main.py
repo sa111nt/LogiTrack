@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.handlers import register_exception_handlers
-from app.core.database import close_db
 from app.config import settings
+from app.core.database import close_db
 from app.routers import auth as auth_router
 from app.routers import category as category_router
 from app.routers import product as product_router

@@ -1,7 +1,7 @@
 """Generic async base repository."""
 
 import logging
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +21,8 @@ class BaseRepository(Generic[ModelT]):
         self.session = session
 
     async def get_by_id(self, entity_id: int) -> ModelT | None:
-        stmt = select(self.model).where(self.model.id == entity_id)
+        model: Any = self.model
+        stmt = select(self.model).where(model.id == entity_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -47,7 +48,7 @@ class BaseRepository(Generic[ModelT]):
         self.session.add(instance)
         await self.session.flush()
         await self.session.refresh(instance)
-        logger.info("Created %s id=%s", self.model.__tablename__, instance.id)
+        logger.info("Created %s id=%s", self.model.__tablename__, instance.id)  # type: ignore[attr-defined]
         return instance
 
     async def update(self, entity_id: int, data: dict) -> ModelT | None:

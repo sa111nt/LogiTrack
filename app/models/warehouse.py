@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -11,6 +13,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
+if TYPE_CHECKING:
+    from app.models.movement import StockMovement
+    from app.models.product import Product
+
 
 class Warehouse(Base, TimestampMixin):
     __tablename__ = "warehouses"
@@ -22,11 +28,11 @@ class Warehouse(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     stock_entries: Mapped[list["Stock"]] = relationship(back_populates="warehouse")
-    outgoing_movements: Mapped[list["StockMovement"]] = relationship(  # noqa: F821
+    outgoing_movements: Mapped[list["StockMovement"]] = relationship(
         back_populates="from_warehouse",
         foreign_keys="StockMovement.from_warehouse_id",
     )
-    incoming_movements: Mapped[list["StockMovement"]] = relationship(  # noqa: F821
+    incoming_movements: Mapped[list["StockMovement"]] = relationship(
         back_populates="to_warehouse",
         foreign_keys="StockMovement.to_warehouse_id",
     )
@@ -55,9 +61,7 @@ class Stock(Base, TimestampMixin):
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    product: Mapped["Product"] = relationship(  # noqa: F821
-        back_populates="stock_entries"
-    )
+    product: Mapped["Product"] = relationship(back_populates="stock_entries")
     warehouse: Mapped["Warehouse"] = relationship(back_populates="stock_entries")
 
     __table_args__ = (

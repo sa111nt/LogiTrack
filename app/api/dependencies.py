@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_db
 from app.core.security import decode_token
-from app.models.user import User, UserRole
 from app.models.revoked_token import RevokedToken
+from app.models.user import User, UserRole
 from app.repositories.category import CategoryRepository
 from app.repositories.product import ProductRepository
 from app.repositories.stock import StockRepository
@@ -42,7 +42,7 @@ async def get_current_user(
         jti: str | None = payload.get("jti")
         if email is None or jti is None:
             raise credentials_exception
-            
+
         # Check if token is revoked
         revoked = await session.get(RevokedToken, jti)
         if revoked:

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import get_product_service, require_auth, require_manager
-from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 from app.schemas.base import PaginatedResponse
+from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 from app.services.product import ProductService
 
 router = APIRouter(
@@ -23,8 +23,8 @@ async def create_product(
     body: ProductCreate,
     service: ProductService = Depends(get_product_service),
 ) -> ProductRead:
-    product = await service.create(body.model_dump())
-    product = await service.get_by_id_with_category(product.id)
+    created = await service.create(body.model_dump())
+    product = await service.get_by_id_with_category(created.id)
     return ProductRead.model_validate(product)
 
 
@@ -76,10 +76,10 @@ async def update_product(
     body: ProductUpdate,
     service: ProductService = Depends(get_product_service),
 ) -> ProductRead:
-    product = await service.update(product_id, body.model_dump(exclude_unset=True))
-    if product is None:
+    updated = await service.update(product_id, body.model_dump(exclude_unset=True))
+    if updated is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    product = await service.get_by_id_with_category(product.id)
+    product = await service.get_by_id_with_category(updated.id)
     return ProductRead.model_validate(product)
 
 

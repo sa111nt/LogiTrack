@@ -1,10 +1,14 @@
 import enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Index, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.movement import StockMovement
 
 
 class UserRole(str, enum.Enum):
@@ -27,7 +31,7 @@ class User(Base, TimestampMixin):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    stock_movements: Mapped[list["StockMovement"]] = relationship(  # noqa: F821
+    stock_movements: Mapped[list["StockMovement"]] = relationship(
         back_populates="performed_by"
     )
 

@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import get_user_service, require_admin
 from app.core.security import hash_password
-from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.base import PaginatedResponse
+from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.services.user import UserService
 
 router = APIRouter(

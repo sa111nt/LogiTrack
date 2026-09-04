@@ -1,9 +1,16 @@
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.category import Category
+    from app.models.movement import StockMovement
+    from app.models.supplier import Supplier
+    from app.models.warehouse import Stock
 
 
 class Product(Base, TimestampMixin):
@@ -21,19 +28,13 @@ class Product(Base, TimestampMixin):
         nullable=True,
     )
 
-    category: Mapped["Category | None"] = relationship(  # noqa: F821
-        back_populates="products"
-    )
-    suppliers: Mapped[list["Supplier"]] = relationship(  # noqa: F821
+    category: Mapped["Category | None"] = relationship(back_populates="products")
+    suppliers: Mapped[list["Supplier"]] = relationship(
         secondary="product_supplier",
         back_populates="products",
     )
-    stock_entries: Mapped[list["Stock"]] = relationship(  # noqa: F821
-        back_populates="product"
-    )
-    movements: Mapped[list["StockMovement"]] = relationship(  # noqa: F821
-        back_populates="product"
-    )
+    stock_entries: Mapped[list["Stock"]] = relationship(back_populates="product")
+    movements: Mapped[list["StockMovement"]] = relationship(back_populates="product")
 
     __table_args__ = (Index("ix_products_sku", "sku"),)
 

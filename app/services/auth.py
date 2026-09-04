@@ -1,8 +1,9 @@
 import logging
+from datetime import UTC, datetime
 
 import jwt
-from datetime import datetime, UTC
 from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AlreadyExistsError
 from app.core.security import (
@@ -12,9 +13,8 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.user import User
 from app.models.revoked_token import RevokedToken
+from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.auth import TokenPair
 from app.schemas.user import UserRegister

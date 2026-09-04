@@ -1,8 +1,10 @@
 from app.models.associations import product_supplier
 from app.models.base import Base, TimestampMixin
 from app.models.category import Category
+from app.models.idempotency import IdempotencyKey
 from app.models.movement import MovementType, StockMovement
 from app.models.product import Product
+from app.models.revoked_token import RevokedToken
 from app.models.supplier import Supplier
 from app.models.user import User, UserRole
 from app.models.warehouse import Stock, Warehouse
@@ -20,7 +22,6 @@ __all__ = [
     "Stock",
     "MovementType",
     "StockMovement",
+    "IdempotencyKey",
+    "RevokedToken",
 ]
-
-from app.models.revoked_token import RevokedToken
-from app.models.idempotency import IdempotencyKey

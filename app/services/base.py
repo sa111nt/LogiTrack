@@ -3,9 +3,10 @@
 import logging
 from typing import Generic, TypeVar
 
+from app.models.base import Base
 from app.repositories.base import BaseRepository
 
-ModelT = TypeVar("ModelT")
+ModelT = TypeVar("ModelT", bound=Base)
 
 logger = logging.getLogger(__name__)
 
