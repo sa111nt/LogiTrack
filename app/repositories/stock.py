@@ -14,11 +14,15 @@ class StockRepository:
         self.session = session
 
     # Stock queries
-    async def get_stock(self, product_id: int, warehouse_id: int) -> Stock | None:
+    async def get_stock(
+        self, product_id: int, warehouse_id: int, with_for_update: bool = False
+    ) -> Stock | None:
         stmt = select(Stock).where(
             Stock.product_id == product_id,
             Stock.warehouse_id == warehouse_id,
         )
+        if with_for_update:
+            stmt = stmt.with_for_update()
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 

@@ -102,7 +102,7 @@ Stock movement requests also support an optional `Idempotency-Key`. The server s
 
 Atomicity comes from the session-per-request pattern: `get_async_db` commits once at the end of the request and rolls back on any exception, so a `TRANSFER` that fails writing the destination side rolls back the source side with it - there's no state where only half a transfer went through.
 
-The check-then-mutate sequence intentionally does not take a row lock (`SELECT ... FOR UPDATE`). Two concurrent requests hitting the same `(product_id, warehouse_id)` pair can both read the same quantity before either one commits. The database-level `CHECK (quantity >= 0)` prevents invalid negative stock from being committed, but full serialization would require row locking or optimistic concurrency control.
+The check-then-mutate sequence uses a row lock (`SELECT ... FOR UPDATE`) inside `_ensure_sufficient_stock`. When two concurrent requests hit the same `(product_id, warehouse_id)` pair, the database will serialize them, forcing the second transaction to wait until the first commits or rolls back, ensuring strict consistency and preventing race conditions. This complements the database-level `CHECK (quantity >= 0)` constraint.
 
 ### Idempotency
 

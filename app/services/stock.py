@@ -50,9 +50,13 @@ class StockService:
             ).hexdigest()
             if cached:
                 if cached.user_id != performed_by_id:
-                    raise ResourceConflictError("Idempotency key already used by a different user")
+                    raise ResourceConflictError(
+                        "Idempotency key already used by a different user"
+                    )
                 if cached.request_hash != request_hash:
-                    raise ResourceConflictError("Idempotency key already used for a different request")
+                    raise ResourceConflictError(
+                        "Idempotency key already used for a different request"
+                    )
                 logger.info(f"Idempotency cache hit for {idempotency_key}")
                 return StockMovementRead(**cached.response_body)
 
@@ -139,7 +143,9 @@ class StockService:
     async def _ensure_sufficient_stock(
         self, product_id: int, warehouse_id: int, required_qty: int
     ) -> Stock:
-        stock = await self.repository.get_stock(product_id, warehouse_id)
+        stock = await self.repository.get_stock(
+            product_id, warehouse_id, with_for_update=True
+        )
         available = stock.quantity if stock else 0
         if available < required_qty:
             raise InsufficientStockError(
