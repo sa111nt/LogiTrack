@@ -17,7 +17,7 @@ An async FastAPI backend for managing inventory across multiple warehouses. The 
 | API framework | FastAPI, Uvicorn |
 | Database | PostgreSQL 16, SQLAlchemy 2.0 (async), Alembic |
 | Auth | JWT (`PyJWT`), Argon2 password hashing (`pwdlib`) |
-| Testing | pytest, pytest-asyncio, httpx (ASGI transport), in-memory SQLite |
+| Testing | pytest, pytest-asyncio, httpx (ASGI transport), PostgreSQL-backed integration fixtures |
 | Infra | Docker, Docker Compose |
 | Linting | Ruff |
 
@@ -212,9 +212,11 @@ Full interactive documentation is generated automatically by FastAPI and served 
 pytest
 ```
 
-Tests run against an in-memory SQLite database through `httpx`'s ASGI transport, so no Postgres instance is needed to run the suite. Unit tests hit the JWT/password module and `StockService`'s business rules directly - movement validation and insufficient-stock handling.
+Unit tests hit the JWT/password module and `StockService`'s business rules directly against a mocked repository - movement type/warehouse validation and insufficient-stock handling - with no database involved.
 
-Integration tests cover user registration and login, authenticated profile access, logout and token revocation, product and category routes, stock movements, idempotency behavior, conflicting idempotency keys, and concurrent movement behavior.
+Integration tests run through `httpx`'s ASGI transport against a real PostgreSQL database. `tests/conftest.py` creates a dedicated `logitrack_test` database on the fly, rebuilds the schema for every test, and hands each request its own session with commit/rollback semantics matching production. That heavyweight setup exists for a reason: the concurrency guarantees - row locking, ordered stock writes, and idempotency reservation - depend on real Postgres behavior (`SELECT ... FOR UPDATE`, unique-constraint races), so a relational database is required to run the suite.
+
+The integration coverage includes user registration and login, logout and token revocation, product and category routes, stock movements (IN/OUT/TRANSFER), idempotent retries returning the cached response, conflicting idempotency keys being rejected with `409`, concurrent `OUT` movements being serialized so stock never goes negative, concurrent first stock creation producing a single `Stock` row, and concurrent requests with the same idempotency key running the business logic exactly once.
 
 ## License
 
