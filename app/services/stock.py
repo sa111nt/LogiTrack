@@ -1,6 +1,10 @@
 import hashlib
 import json
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi.encoders import jsonable_encoder
 
@@ -43,73 +47,124 @@ class StockService:
         performed_by_id: int,
         idempotency_key: str | None = None,
     ) -> StockMovementRead:
-        # Idempotency check
-        request_hash = ""
+        session = self.repository.session
+
+        request_hash = hashlib.sha256(
+            json.dumps(data.model_dump(mode="json"), sort_keys=True).encode()
+        ).hexdigest()
+
         if idempotency_key:
-            session = self.repository.session
-            cached = await session.get(IdempotencyKey, idempotency_key)
-            # Create a deterministic fingerprint of the request
-            request_hash = hashlib.sha256(
-                json.dumps(data.model_dump(mode="json"), sort_keys=True).encode()
-            ).hexdigest()
-            if cached:
-                if cached.user_id != performed_by_id:
-                    raise ResourceConflictError(
-                        "Idempotency key already used by a different user"
-                    )
-                if cached.request_hash != request_hash:
-                    raise ResourceConflictError(
-                        "Idempotency key already used for a different request"
-                    )
-                logger.info(f"Idempotency cache hit for {idempotency_key}")
+            cached = await self._reserve_or_return_idempotency(
+                session, idempotency_key, request_hash, performed_by_id
+            )
+            if cached is not None:
+                logger.info("Idempotency cache hit for key=%s", idempotency_key)
                 return StockMovementRead(**cached.response_body)
 
         self._validate_warehouse_refs(data)
 
-        match data.movement_type:
-            case MovementType.incoming:
-                await self._process_incoming(data)
-            case MovementType.outgoing:
-                await self._process_outgoing(data)
-            case MovementType.transfer:
-                await self._process_transfer(data)
+        try:
+            match data.movement_type:
+                case MovementType.incoming:
+                    await self._process_incoming(data)
+                case MovementType.outgoing:
+                    await self._process_outgoing(data)
+                case MovementType.transfer:
+                    await self._process_transfer(data)
 
-        movement = await self.repository.create_movement(
-            {
-                "movement_type": data.movement_type,
-                "product_id": data.product_id,
-                "from_warehouse_id": data.from_warehouse_id,
-                "to_warehouse_id": data.to_warehouse_id,
-                "quantity": data.quantity,
-                "notes": data.notes,
-                "performed_by_id": performed_by_id,
-            }
-        )
-
-        logger.info(
-            "Processed %s movement id=%s: product=%s qty=%s",
-            data.movement_type.value,
-            movement.id,
-            data.product_id,
-            data.quantity,
-        )
-
-        # Serialize for response and cache
-        response_data = jsonable_encoder(StockMovementRead.model_validate(movement))
-
-        if idempotency_key:
-            session = self.repository.session
-            idem = IdempotencyKey(
-                key=idempotency_key,
-                request_hash=request_hash,
-                user_id=performed_by_id,
-                status_code=201,
-                response_body=response_data,
+            movement = await self.repository.create_movement(
+                {
+                    "movement_type": data.movement_type,
+                    "product_id": data.product_id,
+                    "from_warehouse_id": data.from_warehouse_id,
+                    "to_warehouse_id": data.to_warehouse_id,
+                    "quantity": data.quantity,
+                    "notes": data.notes,
+                    "performed_by_id": performed_by_id,
+                }
             )
-            session.add(idem)
-            await session.commit()
 
-        return StockMovementRead.model_validate(movement)
+            logger.info(
+                "Processed %s movement id=%s: product=%s qty=%s",
+                data.movement_type.value,
+                movement.id,
+                data.product_id,
+                data.quantity,
+            )
+
+            response_data = jsonable_encoder(StockMovementRead.model_validate(movement))
+
+            if idempotency_key:
+                idem = await session.get(IdempotencyKey, idempotency_key)
+                if idem is not None:
+                    idem.status_code = 201
+                    idem.response_body = response_data
+                await session.commit()
+
+            return StockMovementRead.model_validate(movement)
+
+        except Exception:
+            if idempotency_key:
+                await session.rollback()
+                try:
+                    idem = await session.get(IdempotencyKey, idempotency_key)
+                    if idem is not None and idem.status_code == 0:
+                        await session.delete(idem)
+                        await session.commit()
+                except Exception:
+                    logger.exception(
+                        "Failed to clean up idempotency placeholder for key=%s",
+                        idempotency_key,
+                    )
+            raise
+
+    async def _reserve_or_return_idempotency(
+        self,
+        session: "AsyncSession",
+        idempotency_key: str,
+        request_hash: str,
+        performed_by_id: int,
+    ) -> IdempotencyKey | None:
+        from sqlalchemy.exc import IntegrityError
+
+        placeholder = IdempotencyKey(
+            key=idempotency_key,
+            request_hash=request_hash,
+            user_id=performed_by_id,
+            status_code=0,
+            response_body={},
+        )
+
+        try:
+            async with session.begin_nested():
+                session.add(placeholder)
+                await session.flush()
+            await session.commit()
+            return None
+
+        except IntegrityError:
+            session.expire_all()
+            existing = await session.get(IdempotencyKey, idempotency_key)
+
+            if existing is None:
+                raise ResourceConflictError(
+                    "Idempotency key conflict — please retry"
+                ) from None
+            if existing.user_id != performed_by_id:
+                raise ResourceConflictError(
+                    "Idempotency key already used by a different user"
+                ) from None
+            if existing.request_hash != request_hash:
+                raise ResourceConflictError(
+                    "Idempotency key already used for a different request"
+                ) from None
+            if existing.status_code == 0:
+                raise ResourceConflictError(
+                    "A request with this idempotency key is already being processed. "
+                    "Please retry after a moment."
+                ) from None
+
+            return existing
 
     # Validation
     @staticmethod

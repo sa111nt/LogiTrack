@@ -1,6 +1,7 @@
 import logging
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.movement import StockMovement
@@ -27,16 +28,31 @@ class StockRepository:
         return result.scalar_one_or_none()
 
     async def get_or_create_stock(self, product_id: int, warehouse_id: int) -> Stock:
-        stock = await self.get_stock(product_id, warehouse_id)
-        if stock is None:
-            stock = Stock(
-                product_id=product_id,
-                warehouse_id=warehouse_id,
-                quantity=0,
+        stock = await self.get_stock(product_id, warehouse_id, with_for_update=True)
+        if stock is not None:
+            return stock
+
+        try:
+            async with self.session.begin_nested():
+                stock = Stock(
+                    product_id=product_id,
+                    warehouse_id=warehouse_id,
+                    quantity=0,
+                )
+                self.session.add(stock)
+                await self.session.flush()
+            return stock
+        except IntegrityError:
+            self.session.expire_all()
+            existing = await self.get_stock(
+                product_id, warehouse_id, with_for_update=True
             )
-            self.session.add(stock)
-            await self.session.flush()
-        return stock
+            if existing is None:
+                raise RuntimeError(
+                    f"Stock row for product_id={product_id}, "
+                    f"warehouse_id={warehouse_id} vanished after concurrent creation"
+                ) from None
+            return existing
 
     async def get_stock_by_warehouse(
         self, warehouse_id: int, offset: int = 0, limit: int = 100

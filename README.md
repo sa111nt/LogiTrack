@@ -100,15 +100,19 @@ Stock movement requests also support an optional `Idempotency-Key`. The server s
 2. For `OUT` and `TRANSFER`, checks there's enough stock before debiting anything, raising a domain-specific `InsufficientStockError` if there isn't.
 3. Updates the relevant `Stock` row(s) and inserts the audit record - all inside a single `AsyncSession`.
 
-Atomicity comes from the session-per-request pattern: `get_async_db` commits once at the end of the request and rolls back on any exception, so a `TRANSFER` that fails writing the destination side rolls back the source side with it - there's no state where only half a transfer went through.
+Atomicity comes from the session-per-request pattern: `get_async_db` commits the pending transaction at the end of the request and rolls back on any exception, so a `TRANSFER` that fails writing the destination side rolls back the source side with it - there's no state where only half a transfer went through. The only mid-request commit is the idempotency-key reservation, which is intentionally persisted before the movement runs so that a concurrent duplicate request can detect it.
 
-The check-then-mutate sequence uses a row lock (`SELECT ... FOR UPDATE`) inside `_ensure_sufficient_stock`. When two concurrent requests hit the same `(product_id, warehouse_id)` pair, the database will serialize them, forcing the second transaction to wait until the first commits or rolls back, ensuring strict consistency and preventing race conditions. This complements the database-level `CHECK (quantity >= 0)` constraint.
+The check-then-mutate sequence uses a row lock (`SELECT ... FOR UPDATE`) on the affected `Stock` row(s). When two concurrent requests hit the same `(product_id, warehouse_id)` pair, the database serializes them, forcing the second transaction to wait until the first commits or rolls back, so the check-then-debit sequence can never interleave. This complements the database-level `CHECK (quantity >= 0)` constraint.
+
+The same lock protects the very first movement for a product-warehouse pair: when no `Stock` row exists yet, `get_or_create_stock` attempts to insert one inside a nested transaction, and if a concurrent request already created it, the unique constraint violation is caught and the winner's row is returned instead - a duplicate row can never slip through.
 
 ### Idempotency
 
 `POST /stock/movements` accepts an optional `Idempotency-Key` header. Each key is stored together with a SHA-256 request fingerprint, the authenticated user ID, the response status, and the serialized response body.
 
-A repeated request with the same key and payload returns the previously stored response. If the same key is reused with a different payload, the service raises `ResourceConflictError`, which is mapped to `409 Conflict`.
+The key is reserved, and committed, *before* the movement is processed, so concurrent retries with the same key can never both run the business logic. A reservation starts in a pending state: a successful movement atomically completes it with the stored `201` response, while a failed movement is rolled back with its reservation cleaned up, leaving the key free for a later retry.
+
+A repeated request with the same key and payload returns the previously stored response. If the same key is reused with a different payload, by a different user, or while another request with it is still in flight, the service raises `ResourceConflictError`, which is mapped to `409 Conflict`.
 
 ### Authentication & token revocation
 
