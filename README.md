@@ -6,6 +6,7 @@
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-CC2927)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![pytest](https://img.shields.io/badge/pytest-8.3-0A9EDC?logo=pytest&logoColor=white)
+![CI](https://github.com/sa111nt/LogiTrack/actions/workflows/ci.yml/badge.svg)
 
 An async FastAPI backend for managing inventory across multiple warehouses. The core of it is a stock-movement service that processes incoming, outgoing, and inter-warehouse transfer operations against a schema with real constraints enforced at the database level, plus role-based access control, JWT authentication with token revocation, idempotent stock movements, and a consistent Router -> Service -> Repository split across every domain.
 
@@ -18,8 +19,9 @@ An async FastAPI backend for managing inventory across multiple warehouses. The 
 | Database | PostgreSQL 16, SQLAlchemy 2.0 (async), Alembic |
 | Auth | JWT (`PyJWT`), Argon2 password hashing (`pwdlib`) |
 | Testing | pytest, pytest-asyncio, httpx (ASGI transport), PostgreSQL-backed integration fixtures |
-| Infra | Docker, Docker Compose |
+| CI | GitHub Actions (Ruff lint & format, Mypy, pytest) |
 | Linting | Ruff |
+| Infra | Docker, Docker Compose |
 
 ## Architecture & Key Design Decisions
 
@@ -217,6 +219,17 @@ Unit tests hit the JWT/password module and `StockService`'s business rules direc
 Integration tests run through `httpx`'s ASGI transport against a real PostgreSQL database. `tests/conftest.py` creates a dedicated `logitrack_test` database on the fly, rebuilds the schema for every test, and hands each request its own session with commit/rollback semantics matching production. That heavyweight setup exists for a reason: the concurrency guarantees - row locking, ordered stock writes, and idempotency reservation - depend on real Postgres behavior (`SELECT ... FOR UPDATE`, unique-constraint races), so a relational database is required to run the suite.
 
 The integration coverage includes user registration and login, logout and token revocation, product and category routes, stock movements (IN/OUT/TRANSFER), idempotent retries returning the cached response, conflicting idempotency keys being rejected with `409`, concurrent `OUT` movements being serialized so stock never goes negative, concurrent first stock creation producing a single `Stock` row, and concurrent requests with the same idempotency key running the business logic exactly once.
+
+## Continuous Integration
+
+CI runs on every push and pull request to `main` via GitHub Actions (`.github/workflows/ci.yml`). The pipeline starts a PostgreSQL 16 service container, then runs, in order:
+
+1. Ruff lint check (`ruff check .`)
+2. Ruff format check (`ruff format --check .`)
+3. Mypy type checking (`mypy .`)
+4. The full test suite against the Postgres-backed fixtures (`pytest -v`)
+
+A green pipeline means the code is linted, formatted, type-checked, and every concurrency/idempotency guarantee is verified against a real database.
 
 ## License
 
