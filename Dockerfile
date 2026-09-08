@@ -5,12 +5,13 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+RUN useradd -m -u 1000 logitrackuser
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY --chown=logitrackuser:logitrackuser . .
 
-RUN useradd -m logitrackuser && chown -R logitrackuser /app
 USER logitrackuser
 
 EXPOSE 8000

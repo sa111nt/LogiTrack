@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncGenerator
 
 import pytest_asyncio
@@ -5,17 +6,17 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.config import settings
 from app.core.database import get_async_db
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.base import Base
 from app.models.user import User, UserRole
 
-PG_TEST_URL = (
-    "postgresql+asyncpg://logitrack_user:secretpassword@localhost:5432/logitrack_test"
-)
-PG_ROOT_URL = (
-    "postgresql+asyncpg://logitrack_user:secretpassword@localhost:5432/logitrack_db"
+PG_ROOT_URL = settings.database_url
+PG_TEST_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    settings.database_url.rsplit("/", 1)[0] + "/logitrack_test",
 )
 
 _test_db_ready: bool = False
